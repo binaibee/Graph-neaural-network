@@ -1,0 +1,10 @@
+numpy>=2.0
+pandas>=2.2
+
+# Optional research dependencies:
+# scikit-learn>=1.5
+# sentence-transformers>=3.0
+# torch>=2.4
+# torch-geometric>=2.6
+# lightgbm>=4.5
+# xgboost>=2.1

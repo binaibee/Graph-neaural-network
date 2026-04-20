@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relationship-aware-scam-gnn"
+version = "0.1.0"
+description = "Research scaffold for relationship-aware scam detection with graph neural networks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "OpenAI Codex" }
+]
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2"
+]
+
+[project.optional-dependencies]
+research = [
+  "scikit-learn>=1.5",
+  "sentence-transformers>=3.0",
+  "torch>=2.4",
+  "torch-geometric>=2.6"
+]
+boosting = [
+  "lightgbm>=4.5",
+  "xgboost>=2.1"
+]
+
+[project.scripts]
+scam-gnn = "scam_gnn.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

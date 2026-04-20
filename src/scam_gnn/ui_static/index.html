@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scam Intelligence Workbench</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">SIW</div>
+          <div>
+            <div class="brand-title">Scam Intelligence Workbench</div>
+            <div class="brand-subtitle">Relationship-aware analyst console</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-link" data-route="dashboard">Dashboard</button>
+          <button class="nav-link" data-route="triage">Triage</button>
+          <button class="nav-link" data-route="investigations">Investigations</button>
+          <button class="nav-link" data-route="graph">Graph</button>
+          <button class="nav-link" data-route="datasets">Datasets</button>
+          <button class="nav-link" data-route="experiments">Experiments</button>
+          <button class="nav-link" data-route="features">Features</button>
+          <button class="nav-link" data-route="models">Models</button>
+          <div class="nav-divider"></div>
+          <button class="nav-link" data-route="commands">Commands</button>
+          <button class="nav-link" data-route="settings">Settings</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="footer-label">Active Workspace</div>
+          <div id="workspace-summary" class="footer-value">Loading...</div>
+        </div>
+      </aside>
+
+      <div class="main-shell">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title" class="page-title">Dashboard</h1>
+            <p id="page-subtitle" class="page-subtitle">Loading workspace</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="search-box">
+              <span>Search</span>
+              <input id="global-search" type="search" placeholder="message id, sender, domain, url" />
+            </label>
+            <div id="search-results" class="search-results hidden"></div>
+          </div>
+        </header>
+
+        <main id="page-content" class="page-content">
+          <section class="loading-state">
+            <div class="loading-kicker">Loading</div>
+            <h2>Fetching real data from local endpoints</h2>
+            <p>The frontend only renders data returned by the SQLite-backed API.</p>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

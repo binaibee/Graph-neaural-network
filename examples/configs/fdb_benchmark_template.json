@@ -1,0 +1,30 @@
+{
+  "name": "fdb_benchmark_template",
+  "track": "benchmark",
+  "dataset": {
+    "kind": "csv",
+    "output_dir": "artifacts/fdb_benchmark",
+    "sms_path": "data/benchmark/fdb_sms_export.csv",
+    "email_path": null,
+    "url_path": null,
+    "fdb_key": "yelpchi"
+  },
+  "features": {
+    "embedding_model": "all-MiniLM-L6-v2",
+    "fallback_embedding_dim": 24,
+    "include_graph_statistics": true,
+    "include_text_hashing_fallback": true
+  },
+  "splits": {
+    "train_ratio": 0.6,
+    "validation_ratio": 0.2,
+    "test_ratio": 0.2
+  },
+  "ablation": {
+    "include_cross_channel_edges": true,
+    "include_infrastructure_nodes": true
+  },
+  "seeds": [7, 11, 42],
+  "primary_metric": "pr_auc",
+  "target_precision": 0.9
+}

@@ -1,0 +1,33 @@
+{
+  "name": "phiusiil_url_research",
+  "track": "custom",
+  "dataset": {
+    "kind": "phiusiil_url",
+    "output_dir": "artifacts/phiusiil_url_research",
+    "sms_path": null,
+    "email_path": null,
+    "url_path": "data/public/phiusiil_url_collection.csv",
+    "fdb_key": null,
+    "max_sms_rows": null,
+    "max_email_rows": null,
+    "max_url_rows": 15000
+  },
+  "features": {
+    "embedding_model": "all-MiniLM-L6-v2",
+    "fallback_embedding_dim": 24,
+    "include_graph_statistics": true,
+    "include_text_hashing_fallback": true
+  },
+  "splits": {
+    "train_ratio": 0.6,
+    "validation_ratio": 0.2,
+    "test_ratio": 0.2
+  },
+  "ablation": {
+    "include_cross_channel_edges": true,
+    "include_infrastructure_nodes": true
+  },
+  "seeds": [7, 11, 42],
+  "primary_metric": "pr_auc",
+  "target_precision": 0.9
+}

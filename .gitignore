@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.packages/
+.playwright-mcp/
+.tmp/
+.claude/
+artifacts/
+dist/
+build/
+*.egg-info/
+*.pyc
