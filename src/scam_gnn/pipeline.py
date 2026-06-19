@@ -108,16 +108,38 @@ def _load_custom_events(config: ExperimentConfig, seed: int) -> pd.DataFrame:
 
 
 def _prepare_matrices(feature_bundle, tables):
-    messages = tables.events.drop_duplicates("message_id").copy()
+    messages = tables.events.drop_duplicates("message_id").reset_index(drop=True).copy()
     ordered_ids = list(messages["message_id"])
     x = feature_bundle.message_features.reindex(ordered_ids).fillna(0.0).to_numpy(dtype=np.float32)
     y = messages["label"].to_numpy(dtype=np.float32)
     return messages, x, y
 
 
+def _message_node_order(tables) -> list[str]:
+    """Message-node order used when building PyG heterogeneous tensors.
+
+    ``build_pyg_heterodata`` iterates ``tables.entities`` (sorted by entity_id),
+    so the heterogeneous model emits scores in this order rather than the
+    timestamp order of the evaluation ``messages`` frame.
+    """
+    return tables.entities[tables.entities["entity_type"] == "message"]["entity_id"].tolist()
+
+
+def _homogeneous_message_order(tables) -> list[str]:
+    """Message-node order used when building PyG homogeneous tensors."""
+    return list(tables.events.drop_duplicates("message_id")["message_id"])
+
+
+def _align_message_scores(scores: np.ndarray, source_order: list[str], target_ids) -> np.ndarray:
+    """Reindex GNN scores from their node order to the evaluation ``messages`` order."""
+    aligned = pd.Series(np.asarray(scores), index=source_order).reindex(list(target_ids))
+    return aligned.to_numpy()
+
+
 def _evaluate_scores(messages: pd.DataFrame, scores: np.ndarray, config: ExperimentConfig) -> dict[str, object]:
-    test_frame = messages[messages["split"] == "test"].copy()
-    test_scores = scores[test_frame.index]
+    test_mask = (messages["split"] == "test").to_numpy()
+    test_frame = messages[test_mask].copy()
+    test_scores = np.asarray(scores)[test_mask]
     y_test = test_frame["label"].to_numpy(dtype=int)
     metrics = binary_metrics(y_test, test_scores, target_precision=config.target_precision)
     metrics["per_channel"] = per_channel_metrics(test_frame, test_scores, config.target_precision)
@@ -306,7 +328,8 @@ def _score_model_by_name(
         if not (dependency_status["torch"] and dependency_status["torch_geometric"]):
             raise MissingOptionalDependency(f"Model '{model_name}' requires torch and torch-geometric.")
         homogeneous_data = build_pyg_homogeneous_data(feature_bundle.message_features, tables)
-        return _train_homogeneous_gnn(homogeneous_data, model_name, seed)
+        scores = _train_homogeneous_gnn(homogeneous_data, model_name, seed)
+        return _align_message_scores(scores, _homogeneous_message_order(tables), messages["message_id"])
     if model_name in {"hetero_graphsage", "hetero_hgt"}:
         if dependency_status is None:
             dependency_status = _dependency_status()
@@ -314,8 +337,10 @@ def _score_model_by_name(
             raise MissingOptionalDependency(f"Model '{model_name}' requires torch and torch-geometric.")
         hetero_data = build_pyg_heterodata(tables, feature_bundle.entity_features)
         if model_name == "hetero_hgt":
-            return _train_heterogeneous_hgt(hetero_data, seed)
-        return _train_heterogeneous_gnn(hetero_data, seed)
+            scores = _train_heterogeneous_hgt(hetero_data, seed)
+        else:
+            scores = _train_heterogeneous_gnn(hetero_data, seed)
+        return _align_message_scores(scores, _message_node_order(tables), messages["message_id"])
     raise ValueError(f"Unsupported model name '{model_name}'.")
 
 
@@ -404,11 +429,17 @@ def run_experiment(config: ExperimentConfig) -> dict[str, object]:
         if dependency_status["torch"] and dependency_status["torch_geometric"]:
             homogeneous_data = build_pyg_homogeneous_data(feature_bundle.message_features, tables)
             hetero_data = build_pyg_heterodata(tables, feature_bundle.entity_features)
+            homogeneous_order = _homogeneous_message_order(tables)
+            hetero_order = _message_node_order(tables)
+            target_ids = messages["message_id"]
             for model_name in ["gcn", "graphsage"]:
                 scores = _train_homogeneous_gnn(homogeneous_data, model_name, seed)
+                scores = _align_message_scores(scores, homogeneous_order, target_ids)
                 metrics = _evaluate_scores(messages, scores, config)
                 all_results.setdefault(model_name, []).append({"seed": seed, "metrics": metrics})
-            hetero_scores = _train_heterogeneous_gnn(hetero_data, seed)
+            hetero_scores = _align_message_scores(
+                _train_heterogeneous_gnn(hetero_data, seed), hetero_order, target_ids
+            )
             metrics = _evaluate_scores(messages, hetero_scores, config)
             all_results.setdefault("hetero_graphsage", []).append({"seed": seed, "metrics": metrics})
             score_value = float(metrics.get(config.primary_metric, float("-inf")))
@@ -417,7 +448,9 @@ def run_experiment(config: ExperimentConfig) -> dict[str, object]:
                 best_scores = hetero_scores
                 best_events = messages
                 best_tables = tables
-            hetero_hgt_scores = _train_heterogeneous_hgt(hetero_data, seed)
+            hetero_hgt_scores = _align_message_scores(
+                _train_heterogeneous_hgt(hetero_data, seed), hetero_order, target_ids
+            )
             metrics = _evaluate_scores(messages, hetero_hgt_scores, config)
             all_results.setdefault("hetero_hgt", []).append({"seed": seed, "metrics": metrics})
             score_value = float(metrics.get(config.primary_metric, float("-inf")))

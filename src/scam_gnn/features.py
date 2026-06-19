@@ -113,6 +113,7 @@ def build_message_feature_frame(events: pd.DataFrame, feature_config: FeatureCon
         "split",
         "message_id",
         "source_dataset",
+        "has_native_timestamp",
     }
     extra_numeric = messages.drop(columns=[column for column in excluded_columns if column in messages.columns], errors="ignore")
     extra_numeric = extra_numeric.select_dtypes(include=["number", "bool"])

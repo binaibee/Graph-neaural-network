@@ -33,6 +33,15 @@ const apiState = {
   origins: buildApiOrigins(),
 };
 
+const TRIAGE_PAGE_SIZE = 50;
+const TRIAGE_EXPORT_CAP = 10000;
+const triageState = {
+  items: [],
+  total: 0,
+  params: {},
+  sort: { key: "predicted_score", dir: "desc" },
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
   bindSearch();
@@ -249,16 +258,25 @@ async function renderRoute() {
     const overview = await api("/api/overview");
     workspace.textContent = `${overview.dataset_name} · ${overview.selected_model}`;
     if (route === "dashboard") {
-      const experiments = await api("/api/experiments");
-      page.innerHTML = renderDashboard(overview, experiments);
+      const [experiments, features] = await Promise.all([
+        api("/api/experiments"),
+        api("/api/features").catch(() => null),
+      ]);
+      page.innerHTML = renderDashboard(overview, experiments, features);
       bindDashboard(page);
       return;
     }
     if (route === "triage") {
-      const query = new URLSearchParams({ limit: "50", ...params });
+      const pageNum = Math.max(1, parseInt(params.page || "1", 10) || 1);
+      const offset = (pageNum - 1) * TRIAGE_PAGE_SIZE;
+      const query = new URLSearchParams({ ...params, limit: String(TRIAGE_PAGE_SIZE), offset: String(offset) });
+      query.delete("page");
       const [alerts, datasets] = await Promise.all([api(`/api/alerts?${query}`), api("/api/datasets")]);
-      page.innerHTML = renderTriage(alerts, datasets, params);
-      bindTriage(page);
+      triageState.items = alerts.items || [];
+      triageState.total = alerts.total || 0;
+      triageState.params = params;
+      page.innerHTML = renderTriage(alerts, datasets, params, pageNum);
+      bindTriage(page, pageNum);
       return;
     }
     if (route === "investigations") {
@@ -305,8 +323,19 @@ async function renderRoute() {
   }
 }
 
-function renderDashboard(overview, experiments) {
+function renderDashboard(overview, experiments, features) {
   const bestExperiments = [...experiments].sort((left, right) => (right.metrics.pr_auc?.mean || 0) - (left.metrics.pr_auc?.mean || 0));
+  const scoreBuckets = features?.stats?.score_distribution || [];
+  const scoreChart = scoreBuckets.length
+    ? svgBarChart(
+        [...scoreBuckets].reverse().map((b) => ({
+          label: b.bucket,
+          value: b.count,
+          color: b.bucket >= "0.7" ? "var(--danger)" : b.bucket >= "0.5" ? "var(--warning)" : "var(--primary-strong)",
+        })),
+        { height: 150 },
+      )
+    : "";
   return `
     <section class="metric-grid">
       ${metricCard("Artifacts", formatNumber(overview.totals.artifacts), `${formatNumber(overview.totals.test_artifacts)} in test split`)}
@@ -314,6 +343,7 @@ function renderDashboard(overview, experiments) {
       ${metricCard("Campaigns", formatNumber(overview.totals.campaigns), "connected suspicious clusters")}
       ${metricCard("Best PR-AUC", formatScore(overview.best_model?.pr_auc || 0), overview.best_model ? overview.best_model.model_name : "n/a")}
     </section>
+    ${scoreChart ? `<section class="panel" style="margin-bottom:18px;"><div class="section-kicker">Risk distribution</div><h2>Predicted score buckets across all artifacts</h2>${scoreChart}</section>` : ""}
     <section class="dashboard-grid">
       <div class="panel">
         <div class="section-kicker">Channel mix</div>
@@ -388,7 +418,68 @@ function renderDashboard(overview, experiments) {
   `;
 }
 
-function renderTriage(alerts, datasets, params) {
+const TRIAGE_COLUMNS = [
+  { key: "event_id", label: "Alert", cell: (it) => `<td class="mono">${escapeHtml(it.event_id)}</td>` },
+  { key: "channel", label: "Channel", cell: (it) => `<td><span class="chip">${escapeHtml(it.channel)}</span></td>` },
+  { key: "timestamp", label: "Timestamp", cell: (it) => `<td>${formatDate(it.timestamp)}</td>` },
+  { key: "sender_key", label: "Sender", cell: (it) => `<td>${escapeHtml(it.sender_key || "unknown")}</td>` },
+  { key: "predicted_score", label: "Score", numeric: true, cell: (it) => `<td><span class="score ${scoreClass(it.predicted_score)}">${formatScore(it.predicted_score)}</span></td>` },
+  { key: "campaign_id", label: "Campaign", cell: (it) => `<td>${escapeHtml(it.campaign_id || "single")}</td>` },
+  { key: "preview", label: "Preview", cell: (it) => `<td class="cell-preview" title="${escapeHtml(it.preview || "")}">${escapeHtml(it.preview || "")}</td>` },
+];
+
+function _triageSortedItems() {
+  const { key, dir } = triageState.sort;
+  const column = TRIAGE_COLUMNS.find((c) => c.key === key);
+  const items = [...triageState.items];
+  items.sort((a, b) => {
+    let left = a[key];
+    let right = b[key];
+    if (column?.numeric) {
+      left = Number(left) || 0;
+      right = Number(right) || 0;
+      return dir === "asc" ? left - right : right - left;
+    }
+    left = String(left ?? "");
+    right = String(right ?? "");
+    return dir === "asc" ? left.localeCompare(right) : right.localeCompare(left);
+  });
+  return items;
+}
+
+function _triageTableBody() {
+  return _triageSortedItems()
+    .map(
+      (item) => `
+      <tr class="table-row" data-alert="${escapeHtml(item.alert_id)}">
+        ${TRIAGE_COLUMNS.map((c) => c.cell(item)).join("")}
+      </tr>`,
+    )
+    .join("");
+}
+
+function _triageHead() {
+  const { key, dir } = triageState.sort;
+  return TRIAGE_COLUMNS.map((c) => {
+    const indicator = c.key === key ? (dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th class="sortable" data-sort="${escapeHtml(c.key)}">${escapeHtml(c.label)}${indicator}</th>`;
+  }).join("");
+}
+
+function _renderTriagePager(pageNum) {
+  const totalPages = Math.max(1, Math.ceil(triageState.total / TRIAGE_PAGE_SIZE));
+  const from = triageState.total === 0 ? 0 : (pageNum - 1) * TRIAGE_PAGE_SIZE + 1;
+  const to = Math.min(triageState.total, pageNum * TRIAGE_PAGE_SIZE);
+  return `
+    <div class="pager">
+      <button class="action-button" id="triage-prev" ${pageNum <= 1 ? "disabled" : ""}>← Prev</button>
+      <span class="pager-info">${formatNumber(from)}–${formatNumber(to)} of ${formatNumber(triageState.total)} · page ${pageNum}/${totalPages}</span>
+      <button class="action-button" id="triage-next" ${pageNum >= totalPages ? "disabled" : ""}>Next →</button>
+    </div>
+  `;
+}
+
+function renderTriage(alerts, datasets, params, pageNum = 1) {
   return `
     <section class="panel">
       <div class="filter-row">
@@ -403,28 +494,20 @@ function renderTriage(alerts, datasets, params) {
       </div>
     </section>
     <section class="panel" style="margin-top:18px;">
-      <div class="section-kicker">Alerts</div>
-      <h2>${formatNumber(alerts.total)} matching artifacts</h2>
+      <div class="panel-head">
+        <div>
+          <div class="section-kicker">Alerts</div>
+          <h2>${formatNumber(alerts.total)} matching artifacts</h2>
+        </div>
+        <button class="action-button" id="triage-export">⬇ Export CSV</button>
+      </div>
       <div class="table-wrapper">
         <table>
-          <thead>
-            <tr><th>Alert</th><th>Channel</th><th>Timestamp</th><th>Sender</th><th>Score</th><th>Campaign</th><th>Preview</th></tr>
-          </thead>
-          <tbody>
-            ${alerts.items.map((item) => `
-              <tr class="table-row" data-alert="${escapeHtml(item.alert_id)}">
-                <td class="mono">${escapeHtml(item.event_id)}</td>
-                <td>${escapeHtml(item.channel)}</td>
-                <td>${formatDate(item.timestamp)}</td>
-                <td>${escapeHtml(item.sender_key || "unknown")}</td>
-                <td><span class="score ${scoreClass(item.predicted_score)}">${formatScore(item.predicted_score)}</span></td>
-                <td>${escapeHtml(item.campaign_id || "single")}</td>
-                <td>${escapeHtml(item.preview || "")}</td>
-              </tr>
-            `).join("")}
-          </tbody>
+          <thead><tr>${_triageHead()}</tr></thead>
+          <tbody id="triage-tbody">${_triageTableBody()}</tbody>
         </table>
       </div>
+      ${_renderTriagePager(pageNum)}
     </section>
   `;
 }
@@ -625,8 +708,28 @@ function renderDatasets(datasets) {
 }
 
 function renderExperiments(experiments, errors) {
+  const ranked = [...experiments].sort((a, b) => (b.metrics.pr_auc?.mean || 0) - (a.metrics.pr_auc?.mean || 0));
+  const overallBars = ranked.map((m) => ({ label: m.model_name, value: m.metrics.pr_auc?.mean || 0 }));
+  const channelGroups = ranked
+    .filter((m) => m.channels && (m.channels.sms || m.channels.url))
+    .map((m) => ({
+      label: m.model_name,
+      values: { sms: m.channels.sms?.pr_auc?.mean || 0, url: m.channels.url?.pr_auc?.mean || 0 },
+    }));
   return `
-    <section class="panel">
+    <section class="chart-grid">
+      <div class="panel">
+        <div class="section-kicker">Visual comparison</div>
+        <h2>PR-AUC by model</h2>
+        ${svgBarChart(overallBars, { height: 200, valueFormat: formatScore })}
+      </div>
+      <div class="panel">
+        <div class="section-kicker">Per-channel</div>
+        <h2>SMS vs URL PR-AUC</h2>
+        ${svgGroupedBars(channelGroups, [{ key: "sms", label: "SMS" }, { key: "url", label: "URL" }], { height: 200 })}
+      </div>
+    </section>
+    <section class="panel" style="margin-top:18px;">
       <div class="section-kicker">Leaderboard</div>
       <h2>Overall experiment comparison</h2>
       <div class="table-wrapper">
@@ -682,7 +785,7 @@ function bindDashboard(page) {
   page.querySelectorAll("[data-campaign]").forEach((item) => item.addEventListener("click", () => setRoute("graph", { campaign: item.dataset.campaign })));
 }
 
-function bindTriage(page) {
+function bindTriage(page, pageNum = 1) {
   document.getElementById("triage-apply").addEventListener("click", () => {
     const nextParams = {};
     const channel = document.getElementById("triage-channel").value;
@@ -696,7 +799,61 @@ function bindTriage(page) {
     setRoute("triage", nextParams);
   });
   document.getElementById("triage-reset").addEventListener("click", () => setRoute("triage"));
+
+  const prev = document.getElementById("triage-prev");
+  const next = document.getElementById("triage-next");
+  const baseParams = { ...triageState.params };
+  delete baseParams.page;
+  if (prev) prev.addEventListener("click", () => setRoute("triage", { ...baseParams, page: String(pageNum - 1) }));
+  if (next) next.addEventListener("click", () => setRoute("triage", { ...baseParams, page: String(pageNum + 1) }));
+
+  const exportBtn = document.getElementById("triage-export");
+  if (exportBtn) exportBtn.addEventListener("click", () => exportTriageCsv(exportBtn));
+
+  bindTriageSortHeaders(page);
   bindAlertRows(page);
+}
+
+function bindTriageSortHeaders(page) {
+  page.querySelectorAll("th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (triageState.sort.key === key) {
+        triageState.sort.dir = triageState.sort.dir === "asc" ? "desc" : "asc";
+      } else {
+        triageState.sort = { key, dir: "desc" };
+      }
+      const head = page.querySelector("thead tr");
+      const body = document.getElementById("triage-tbody");
+      if (head) head.innerHTML = _triageHead();
+      if (body) body.innerHTML = _triageTableBody();
+      bindAlertRows(page);
+      bindTriageSortHeaders(page);
+    });
+  });
+}
+
+async function exportTriageCsv(button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Exporting…";
+  try {
+    const params = { ...triageState.params };
+    delete params.page;
+    const query = new URLSearchParams({ ...params, limit: String(TRIAGE_EXPORT_CAP), offset: "0" });
+    const payload = await api(`/api/alerts?${query}`);
+    const header = ["event_id", "channel", "timestamp", "sender_key", "recipient_key", "predicted_score", "predicted_label", "split", "campaign_id", "preview"];
+    const rows = [header, ...(payload.items || []).map((it) => header.map((k) => it[k]))];
+    downloadCsv("triage_alerts.csv", rows);
+    button.textContent = `Exported ${formatNumber((payload.items || []).length)}`;
+  } catch (error) {
+    button.textContent = "Export failed";
+  } finally {
+    setTimeout(() => {
+      button.disabled = false;
+      button.textContent = original;
+    }, 2000);
+  }
 }
 
 function bindAlertRows(page) {
@@ -1543,20 +1700,142 @@ function renderGraph(host, graph) {
     const source = positions.get(edge.source);
     const target = positions.get(edge.target);
     if (!source || !target) return "";
-    return `<line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="#334464" stroke-width="1.4" />`;
+    return `<line class="gedge" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="#334464" stroke-width="1.4" />`;
   }).join("");
   const nodes = graph.nodes.map((node) => {
     const position = positions.get(node.id);
     const fill = nodeColors[node.type] || "#8fb8ff";
+    const isMessage = node.type === "message";
+    const nav = isMessage ? `data-nav-alert="${escapeHtml(node.label)}"` : `data-nav-entity="${escapeHtml(node.id)}"`;
     return `
-      <g>
-        <circle cx="${position.x}" cy="${position.y}" r="${node.type === "message" ? 24 : 18}" fill="${fill}" fill-opacity="0.18" stroke="${fill}" stroke-width="1.6" />
+      <g class="gnode" data-id="${escapeHtml(node.id)}" data-type="${escapeHtml(node.type)}" ${nav}>
+        <title>${escapeHtml(node.label)} · ${escapeHtml(node.subtitle || node.type)}${node.score != null ? ` · ${formatScore(node.score)}` : ""}</title>
+        <circle cx="${position.x}" cy="${position.y}" r="${isMessage ? 24 : 18}" fill="${fill}" fill-opacity="0.18" stroke="${fill}" stroke-width="1.6" />
         <text x="${position.x}" y="${position.y - 30}" text-anchor="middle" fill="#e4ebff" font-size="11">${escapeHtml(shortLabel(node.label))}</text>
         <text x="${position.x}" y="${position.y - 16}" text-anchor="middle" fill="#8fa2c8" font-size="9">${escapeHtml(node.subtitle || node.type)}</text>
       </g>
     `;
   }).join("");
   host.innerHTML = `<svg class="graph-canvas" viewBox="0 0 ${width} ${height}">${edges}${nodes}</svg>`;
+  bindGraphInteractions(host);
+}
+
+function bindGraphInteractions(host) {
+  const svg = host.querySelector("svg");
+  if (!svg) return;
+  const nodeEls = Array.from(svg.querySelectorAll(".gnode"));
+  const edgeEls = Array.from(svg.querySelectorAll(".gedge"));
+
+  const highlight = (id) => {
+    const connected = new Set([id]);
+    edgeEls.forEach((edge) => {
+      if (edge.dataset.source === id || edge.dataset.target === id) {
+        edge.classList.add("active");
+        connected.add(edge.dataset.source);
+        connected.add(edge.dataset.target);
+      } else {
+        edge.classList.add("dim");
+      }
+    });
+    nodeEls.forEach((node) => {
+      node.classList.toggle("dim", !connected.has(node.dataset.id));
+    });
+  };
+  const clearHighlight = () => {
+    edgeEls.forEach((edge) => edge.classList.remove("active", "dim"));
+    nodeEls.forEach((node) => node.classList.remove("dim"));
+  };
+
+  nodeEls.forEach((node) => {
+    node.addEventListener("mouseenter", () => highlight(node.dataset.id));
+    node.addEventListener("mouseleave", clearHighlight);
+    node.addEventListener("click", () => {
+      if (node.dataset.navAlert) {
+        setRoute("investigations", { alert: node.dataset.navAlert });
+      } else if (node.dataset.navEntity) {
+        setRoute("investigations", { entity: node.dataset.navEntity });
+      }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Lightweight inline SVG charts (no external dependencies)
+// ---------------------------------------------------------------------------
+
+const CHART_PALETTE = ["#4b8fff", "#8be0c7", "#d8a5ff", "#ffb65c", "#ff8ea1", "#66d39a"];
+
+function svgBarChart(items, { height = 200, color = "var(--primary-strong)", valueFormat = formatNumber } = {}) {
+  const data = (items || []).filter(Boolean);
+  if (!data.length) {
+    return `<div class="chart-empty">No data to chart.</div>`;
+  }
+  const max = Math.max(...data.map((d) => Number(d.value) || 0), 1);
+  const bars = data
+    .map((d) => {
+      const value = Number(d.value) || 0;
+      const pct = Math.max(2, (value / max) * 100);
+      const tone = d.color || color;
+      return `
+        <div class="bar-col" title="${escapeHtml(String(d.label))}: ${escapeHtml(valueFormat(value))}">
+          <div class="bar-col-value">${escapeHtml(valueFormat(value))}</div>
+          <div class="bar-col-track" style="height:${height}px">
+            <div class="bar-col-fill" style="height:${pct}%;background:${tone}"></div>
+          </div>
+          <div class="bar-col-label">${escapeHtml(shortLabel(String(d.label)))}</div>
+        </div>`;
+    })
+    .join("");
+  return `<div class="bar-chart">${bars}</div>`;
+}
+
+function svgGroupedBars(groups, series, { height = 200, valueFormat = formatScore } = {}) {
+  const data = (groups || []).filter(Boolean);
+  if (!data.length) {
+    return `<div class="chart-empty">No data to chart.</div>`;
+  }
+  const max = Math.max(
+    ...data.flatMap((g) => series.map((s) => Number(g.values[s.key]) || 0)),
+    0.0001,
+  );
+  const legend = series
+    .map((s, i) => `<span class="legend-item"><span class="legend-swatch" style="background:${CHART_PALETTE[i % CHART_PALETTE.length]}"></span>${escapeHtml(s.label)}</span>`)
+    .join("");
+  const cols = data
+    .map((g) => {
+      const inner = series
+        .map((s, i) => {
+          const value = Number(g.values[s.key]) || 0;
+          const pct = Math.max(2, (value / max) * 100);
+          const tone = CHART_PALETTE[i % CHART_PALETTE.length];
+          return `<div class="grouped-bar" title="${escapeHtml(s.label)} ${escapeHtml(g.label)}: ${escapeHtml(valueFormat(value))}"><div class="grouped-bar-fill" style="height:${pct}%;background:${tone}"></div></div>`;
+        })
+        .join("");
+      return `
+        <div class="grouped-col">
+          <div class="grouped-bars" style="height:${height}px">${inner}</div>
+          <div class="bar-col-label">${escapeHtml(shortLabel(String(g.label)))}</div>
+        </div>`;
+    })
+    .join("");
+  return `<div class="grouped-legend">${legend}</div><div class="grouped-chart">${cols}</div>`;
+}
+
+function downloadCsv(filename, rows) {
+  const escapeCell = (cell) => {
+    const text = String(cell ?? "");
+    return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  };
+  const csv = rows.map((row) => row.map(escapeCell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function metricCard(label, value, meta) {
