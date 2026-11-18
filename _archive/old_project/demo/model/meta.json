@@ -1,0 +1,313 @@
+{
+  "model_name": "hetero_graphsage",
+  "seed": 7,
+  "config": "examples\\configs\\uci_sms_phiusiil_multichannel.json",
+  "trained_at": "2026-10-06T14:13:33+00:00",
+  "train_seconds": 51.2,
+  "embedding_backend": "hashed bag-of-words fallback (24 dimensions)",
+  "threshold": 0.5,
+  "feature_columns": [
+    "length",
+    "digit_ratio",
+    "uppercase_ratio",
+    "url_count",
+    "urgent_keyword_count",
+    "channel_sms",
+    "channel_url",
+    "extra_URLLength",
+    "extra_DomainLength",
+    "extra_IsDomainIP",
+    "extra_URLSimilarityIndex",
+    "extra_CharContinuationRate",
+    "extra_TLDLegitimateProb",
+    "extra_URLCharProb",
+    "extra_TLDLength",
+    "extra_NoOfSubDomain",
+    "extra_HasObfuscation",
+    "extra_NoOfObfuscatedChar",
+    "extra_ObfuscationRatio",
+    "extra_NoOfLettersInURL",
+    "extra_LetterRatioInURL",
+    "extra_NoOfDegitsInURL",
+    "extra_DegitRatioInURL",
+    "extra_NoOfEqualsInURL",
+    "extra_NoOfQMarkInURL",
+    "extra_NoOfAmpersandInURL",
+    "extra_NoOfOtherSpecialCharsInURL",
+    "extra_SpacialCharRatioInURL",
+    "extra_IsHTTPS",
+    "extra_LineOfCode",
+    "extra_LargestLineLength",
+    "extra_HasTitle",
+    "extra_DomainTitleMatchScore",
+    "extra_URLTitleMatchScore",
+    "extra_HasFavicon",
+    "extra_Robots",
+    "extra_IsResponsive",
+    "extra_NoOfURLRedirect",
+    "extra_NoOfSelfRedirect",
+    "extra_HasDescription",
+    "extra_NoOfPopup",
+    "extra_NoOfiFrame",
+    "extra_HasExternalFormSubmit",
+    "extra_HasSocialNet",
+    "extra_HasSubmitButton",
+    "extra_HasHiddenFields",
+    "extra_HasPasswordField",
+    "extra_Bank",
+    "extra_Pay",
+    "extra_Crypto",
+    "extra_HasCopyrightInfo",
+    "extra_NoOfImage",
+    "extra_NoOfCSS",
+    "extra_NoOfJS",
+    "extra_NoOfSelfRef",
+    "extra_NoOfEmptyRef",
+    "extra_NoOfExternalRef",
+    "text_emb_000",
+    "text_emb_001",
+    "text_emb_002",
+    "text_emb_003",
+    "text_emb_004",
+    "text_emb_005",
+    "text_emb_006",
+    "text_emb_007",
+    "text_emb_008",
+    "text_emb_009",
+    "text_emb_010",
+    "text_emb_011",
+    "text_emb_012",
+    "text_emb_013",
+    "text_emb_014",
+    "text_emb_015",
+    "text_emb_016",
+    "text_emb_017",
+    "text_emb_018",
+    "text_emb_019",
+    "text_emb_020",
+    "text_emb_021",
+    "text_emb_022",
+    "text_emb_023",
+    "out_degree",
+    "in_degree",
+    "infrastructure_degree"
+  ],
+  "metadata": {
+    "node_types": [
+      "domain",
+      "email_address",
+      "message",
+      "phone",
+      "recipient",
+      "sender",
+      "url"
+    ],
+    "edge_types": [
+      [
+        "message",
+        "contains_url",
+        "url"
+      ],
+      [
+        "url",
+        "rev_contains_url",
+        "message"
+      ],
+      [
+        "message",
+        "sent_by",
+        "sender"
+      ],
+      [
+        "sender",
+        "rev_sent_by",
+        "message"
+      ],
+      [
+        "message",
+        "sent_to",
+        "recipient"
+      ],
+      [
+        "recipient",
+        "rev_sent_to",
+        "message"
+      ],
+      [
+        "message",
+        "shares_infrastructure",
+        "message"
+      ],
+      [
+        "message",
+        "rev_shares_infrastructure",
+        "message"
+      ],
+      [
+        "message",
+        "shares_recipient",
+        "message"
+      ],
+      [
+        "message",
+        "rev_shares_recipient",
+        "message"
+      ],
+      [
+        "message",
+        "shares_sender",
+        "message"
+      ],
+      [
+        "message",
+        "rev_shares_sender",
+        "message"
+      ],
+      [
+        "recipient",
+        "uses_email",
+        "email_address"
+      ],
+      [
+        "email_address",
+        "rev_uses_email",
+        "recipient"
+      ],
+      [
+        "recipient",
+        "uses_phone",
+        "phone"
+      ],
+      [
+        "phone",
+        "rev_uses_phone",
+        "recipient"
+      ],
+      [
+        "sender",
+        "uses_phone",
+        "phone"
+      ],
+      [
+        "phone",
+        "rev_uses_phone",
+        "sender"
+      ],
+      [
+        "url",
+        "resolves_to_domain",
+        "domain"
+      ],
+      [
+        "domain",
+        "rev_resolves_to_domain",
+        "url"
+      ]
+    ]
+  },
+  "dataset": {
+    "num_messages": 20574,
+    "num_nodes": 91816,
+    "num_edges": 79835,
+    "nodes_by_type": {
+      "message": 20574,
+      "sender": 20400,
+      "recipient": 20318,
+      "url": 15011,
+      "domain": 14756,
+      "phone": 756,
+      "email_address": 1
+    },
+    "edges_by_type": {
+      "sent_by": 20574,
+      "sent_to": 20574,
+      "contains_url": 15023,
+      "resolves_to_domain": 15011,
+      "shares_infrastructure": 3531,
+      "shares_recipient": 3490,
+      "shares_sender": 866,
+      "uses_phone": 765,
+      "uses_email": 1
+    },
+    "split_counts": {
+      "test/sms": {
+        "messages": 1115,
+        "scam": 145
+      },
+      "test/url": {
+        "messages": 3000,
+        "scam": 1276
+      },
+      "train/sms": {
+        "messages": 3344,
+        "scam": 446
+      },
+      "train/url": {
+        "messages": 9000,
+        "scam": 3400
+      },
+      "validation/sms": {
+        "messages": 1115,
+        "scam": 156
+      },
+      "validation/url": {
+        "messages": 3000,
+        "scam": 1303
+      }
+    }
+  },
+  "test_metrics": {
+    "precision": 0.9301544660846206,
+    "recall": 0.9746657283603096,
+    "roc_auc": 0.9969322188594353,
+    "pr_auc": 0.9947998788355457,
+    "recall_at_precision": 0.9894440534834623,
+    "per_channel": {
+      "sms": {
+        "precision": 0.5742574257425742,
+        "recall": 0.8,
+        "roc_auc": 0.9478492712406683,
+        "pr_auc": 0.802481890813487,
+        "recall_at_precision": 0.6206896551724138
+      },
+      "url": {
+        "precision": 0.986013986013986,
+        "recall": 0.9945141065830722,
+        "roc_auc": 0.9996245154157787,
+        "pr_auc": 0.999452078730465,
+        "recall_at_precision": 1.0
+      }
+    }
+  },
+  "test_metrics_derived_by_demo": {
+    "overall": {
+      "tp": 1385,
+      "fp": 104,
+      "fn": 36,
+      "tn": 2590,
+      "accuracy": 0.9659781287970839,
+      "f1": 0.9518900343642611
+    },
+    "sms": {
+      "tp": 116,
+      "fp": 86,
+      "fn": 29,
+      "tn": 884,
+      "accuracy": 0.8968609865470852,
+      "f1": 0.6685878962536023
+    },
+    "url": {
+      "tp": 1269,
+      "fp": 18,
+      "fn": 7,
+      "tn": 1706,
+      "accuracy": 0.9916666666666667,
+      "f1": 0.9902458056964496
+    }
+  },
+  "versions": {
+    "python": "3.14.3",
+    "torch": "2.12.1+cpu",
+    "torch_geometric": "2.8.0"
+  }
+}

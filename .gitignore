@@ -10,3 +10,7 @@ dist/
 build/
 *.egg-info/
 *.pyc
+results/cache/
+results/prepared.pkl
+data/raw/
+models/

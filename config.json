@@ -1,0 +1,21 @@
+{
+  "sms_path": "data/public/uci_sms_spam_collection.csv",
+  "email_path": "data/public/spamassassin_email.csv",
+  "url_path": "data/public/phiusiil_url_collection.csv",
+  "max_email_rows": 10000,
+  "max_url_rows": 15000,
+  "data_seed": 7,
+  "train_ratio": 0.6,
+  "validation_ratio": 0.2,
+  "text_embedding": "hashed",
+  "hashed_dim": 24,
+  "max_group_size": 128,
+  "max_urls_per_message": 10,
+  "seeds": [7, 11, 42],
+  "hidden_dim": 64,
+  "learning_rate": 0.002,
+  "weight_decay": 0.0001,
+  "max_epochs": 100,
+  "patience": 15,
+  "results_dir": "results"
+}

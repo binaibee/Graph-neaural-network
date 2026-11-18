@@ -1,0 +1,65 @@
+{
+  "description": "Hand-written SMS messages for the live demonstration. The expected labels are human judgements written BEFORE running the model; they were not adjusted to make the model look good. Phone numbers and links marked 'known' appear in the UCI SMS Spam Collection or PhiUSIIL data that forms the graph.",
+  "cases": [
+    {
+      "id": "T1",
+      "text": "Hey, are we still meeting for lunch at 1pm today?",
+      "expected": "LEGITIMATE",
+      "note": "Ordinary personal message, no links to the graph."
+    },
+    {
+      "id": "T2",
+      "text": "Ok, I'll call you when I get home. Don't wait up.",
+      "expected": "LEGITIMATE",
+      "note": "Ordinary personal message, no links to the graph."
+    },
+    {
+      "id": "T3",
+      "text": "URGENT! You have won a 1 week FREE membership in our 100,000 Prize Jackpot! Call 08000839402 now to claim.",
+      "expected": "SCAM",
+      "note": "Scam text AND a phone number that already appears in spam messages in the graph."
+    },
+    {
+      "id": "T4",
+      "text": "WINNER!! Claim your free prize now at http://www.urawinner.com",
+      "expected": "SCAM",
+      "note": "Scam text AND a link that already appears in spam messages in the graph."
+    },
+    {
+      "id": "T5",
+      "text": "URGENT: Your bank account has been suspended. Click this link immediately to verify your account.",
+      "expected": "SCAM",
+      "note": "Scam wording but NO phone number or link, so the message has no connections in the graph."
+    },
+    {
+      "id": "T6",
+      "text": "Congratulations! You have been selected for a cash reward. Click this link to claim your prize.",
+      "expected": "SCAM",
+      "note": "Scam wording but NO phone number or link, so the message has no connections in the graph."
+    },
+    {
+      "id": "T7",
+      "text": "FREE entry! Text WIN to 80082 or call 09099999999 to claim your 500 pound voucher today.",
+      "expected": "SCAM",
+      "note": "Scam wording with a phone number the graph has never seen."
+    },
+    {
+      "id": "T8",
+      "text": "Hi mum, this is my new number 08000839402, call me when you can.",
+      "expected": "LEGITIMATE",
+      "note": "Stress test: harmless wording, but the number is one used by spam messages in the graph."
+    },
+    {
+      "id": "T9",
+      "text": "Your account document is ready, view it here: https://ipfs.io/ipfs/bafybeiexample/login.html",
+      "expected": "SCAM",
+      "note": "Cross-channel test: an SMS whose link is on a domain used by phishing URLs in the URL dataset."
+    },
+    {
+      "id": "T10",
+      "text": "Your parcel is out for delivery today. Thanks for shopping with us.",
+      "expected": "LEGITIMATE",
+      "note": "Ordinary notification, no links to the graph."
+    }
+  ]
+}

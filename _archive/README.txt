@@ -1,0 +1,1 @@
+Files from the original project that the cleaned-up version no longer uses (old web dashboard, unused models, old configs, unrelated files). Nothing here is needed to run the project. Safe to delete once you are happy with the new version.

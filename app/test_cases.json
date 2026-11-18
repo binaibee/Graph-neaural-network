@@ -1,0 +1,41 @@
+{
+  "description": "Hand-written test inputs for the demonstration. The expected answers are human judgements written before running the model and were not adjusted afterwards. Cases for a channel that is not part of the trained model are skipped.",
+  "cases": [
+    {"id": "S1", "channel": "sms", "expected": "LEGITIMATE", "example": "Normal message",
+     "text": "Hey, are we still meeting for lunch at 1pm today?"},
+    {"id": "S2", "channel": "sms", "expected": "LEGITIMATE",
+     "text": "Ok, I'll call you when I get home. Don't wait up."},
+    {"id": "S3", "channel": "sms", "expected": "SCAM", "example": "Scam with a phone number",
+     "text": "URGENT! You have won a 1 week FREE membership in our 100,000 Prize Jackpot! Call 08000839402 now to claim."},
+    {"id": "S4", "channel": "sms", "expected": "SCAM", "example": "Scam with a link",
+     "text": "WINNER!! Claim your free prize now at http://www.urawinner.com"},
+    {"id": "S5", "channel": "sms", "expected": "SCAM", "example": "Scam with no number or link",
+     "text": "URGENT: Your bank account has been suspended. Click this link immediately to verify your account."},
+    {"id": "S6", "channel": "sms", "expected": "SCAM",
+     "text": "Congratulations! You have been selected for a cash reward. Click this link to claim your prize."},
+    {"id": "S7", "channel": "sms", "expected": "SCAM",
+     "text": "FREE entry! Text WIN to 80082 or call 09099999999 to claim your 500 pound voucher today."},
+    {"id": "S8", "channel": "sms", "expected": "LEGITIMATE",
+     "text": "Hi mum, this is my new number 08000839402, call me when you can."},
+    {"id": "S9", "channel": "sms", "expected": "LEGITIMATE",
+     "text": "Your parcel is out for delivery today. Thanks for shopping with us."},
+
+    {"id": "U1", "channel": "url", "expected": "LEGITIMATE", "example": "Well-known website",
+     "text": "https://www.wikipedia.org/"},
+    {"id": "U2", "channel": "url", "expected": "SCAM", "example": "Suspicious link",
+     "text": "http://secure-login-paypa1.verify-account.xyz/update/index.php?id=8273"},
+    {"id": "U3", "channel": "url", "expected": "SCAM", "example": "Link on a site used by scammers",
+     "text": "https://ipfs.io/ipfs/bafybeiexample/login.html"},
+    {"id": "U4", "channel": "url", "expected": "LEGITIMATE",
+     "text": "https://www.bbc.co.uk/news"},
+
+    {"id": "E1", "channel": "email", "expected": "LEGITIMATE", "example": "Normal email from an unknown sender", "sender": "sarah.jones@university.example.edu",
+     "text": "Seminar room change. Hi all, tomorrow's seminar has moved to room 204 because of maintenance work. The time is unchanged. See you there, Sarah"},
+    {"id": "E2", "channel": "email", "expected": "SCAM", "example": "Phishing email", "sender": "security-alert@paypa1-support.example.net",
+     "text": "Your account has been limited. Dear customer, we noticed unusual activity on your account. To avoid suspension you must confirm your details within 24 hours at http://paypa1-support.example.net/verify/login.php"},
+    {"id": "E3", "channel": "email", "expected": "SCAM", "example": "Advance-fee fraud email", "sender": "barrister.james@lawchambers.example.org",
+     "text": "Confidential business proposal. I am a barrister acting for a deceased client who left 8.5 million US dollars unclaimed. I need your assistance to transfer these funds and you will receive 30 percent. Reply urgently with your bank details and telephone number."},
+    {"id": "E4", "channel": "email", "expected": "LEGITIMATE", "sender": "noreply@library.example.org",
+     "text": "Your library books are due soon. This is a reminder that two items on your account are due back on Friday. You can renew them online or at the front desk."}
+  ]
+}

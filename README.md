@@ -1,191 +1,80 @@
-# Relationship-Aware Scam Detection Using Graph Neural Networks Across Multi-Channel Communications
+# Scam Detection Using Graph Neural Networks Across Multi-Channel Communications
 
-This repository is a research-oriented scaffold for building and evaluating relationship-aware scam detection models across SMS, email, and URL/domain infrastructure signals.
+A final-year research project. Messages from three communication channels (SMS, email and web links) are placed in
+one graph together with the senders, recipients, links, websites and phone numbers they refer to. A Graph Neural
+Network (GNN) then classifies every message as **scam** or **legitimate**, and is compared with two standard models
+that do not use the graph.
 
-The codebase is designed around two tracks:
+The full explanation of the project, written for the defence, is in
+[docs/PROJECT_HANDBOOK.md](docs/PROJECT_HANDBOOK.md).
 
-- `benchmark`: adapters for standardized public fraud/abuse benchmarks such as FDB.
-- `custom`: a heterogeneous multi-channel graph pipeline that fuses public SMS, email, and phishing URL data into one graph-centric experiment.
+## The pipeline
 
-## Current Status
+| Stage | File | What it does |
+|---|---|---|
+| 1. Data | `src/scam_gnn/data.py` | Loads the three datasets, cleans them, removes duplicates, splits 60/20/20 |
+| 2. Graph construction | `src/scam_gnn/graph.py` | Creates the nodes and edges |
+| 3. Features | `src/scam_gnn/features.py` | Describes every node with numbers |
+| 4. Models | `src/scam_gnn/models.py` | Logistic regression, gradient-boosted trees, heterogeneous GraphSAGE |
+| 5. Training | `src/scam_gnn/train.py` | Trains everything, runs the graph ablation, saves model and results |
+| 6. Evaluation | `src/scam_gnn/evaluate.py` | Accuracy, precision, recall, F1, ROC-AUC, PR-AUC, confusion matrix |
+| 7. Prediction | `src/scam_gnn/predict.py` | Scores one new message with the saved GNN |
+| 8. Explanation | `src/scam_gnn/explain.py` | Removes one factor at a time and scores again |
+| 9. Demonstration | `app/app.py` | One-page Streamlit demo |
 
-The scaffold is implemented to run end-to-end on synthetic multi-channel data using only `numpy` and `pandas`.
+All settings are in `config.json`.
 
-Optional model paths are also implemented for:
+## Data
 
-- `scikit-learn` tree baselines
-- `sentence-transformers` MiniLM embeddings
-- `torch` and `torch-geometric` GNN models
+| Channel | Dataset | Records used | Sender / recipient information |
+|---|---|---|---|
+| SMS | UCI SMS Spam Collection | 5,159 | none |
+| Email | SpamAssassin public corpus (from the Zenodo "Phishing Email Curated Datasets" collection, CC BY 4.0) | 5,784 | yes |
+| Web link | PhiUSIIL Phishing URL dataset (random sample) | 14,996 | none |
 
-Those optional dependencies are not installed in the current workspace, so the CLI and tests automatically fall back or skip the relevant steps.
+Phone calls are not included in this version; the handbook explains why.
 
-## Core Design
+## Results (test data, average of 3 training runs, F1-score)
 
-Standardized tables:
+| Model | SMS | Email | Web links | All channels |
+|---|---|---|---|---|
+| Logistic regression | 0.667 | 0.594 | 0.884 | 0.799 |
+| Gradient-boosted trees | 0.911 | 0.816 | 0.968 | 0.935 |
+| **Heterogeneous GraphSAGE (GNN)** | 0.870 | **0.944** | **0.982** | **0.967** |
+| GNN without message-to-message edges | 0.874 | 0.921 | 0.983 | 0.963 |
+| GNN with no edges at all | 0.870 | 0.809 | 0.958 | 0.922 |
 
-- `events`: one row per communication artifact
-- `entities`: canonical nodes for senders, recipients, addresses, URLs, and domains
-- `relations`: typed, timestamped edges
-- `splits`: rolling time-based train/validation/test assignments
+The graph helps most where the data contains real relationships (email), helps a little for web links, and does not
+help for SMS, where the dataset has no sender information. Every number is produced by `python -m scam_gnn.train` and
+stored in `results/results.json`.
 
-Graph schema:
+## Run it
 
-- Node types: `message`, `sender`, `recipient`, `phone`, `email_address`, `url`, `domain`
-- Edge types: `sent_by`, `sent_to`, `uses_phone`, `uses_email`, `contains_url`, `resolves_to_domain`, `shares_sender`, `shares_recipient`, `shares_infrastructure`
-
-Model ladder:
-
-- Logistic regression baseline
-- Tree ensemble baseline
-- MLP baseline
-- Homogeneous GCN and GraphSAGE
-- Message-centric, relation-pruned heterogeneous GraphSAGE in PyG
-- Message-centric heterogeneous HGT with `HGTConv`
-
-## Quick Start
-
-Install the minimal package:
-
-```bash
-python -m pip install -e .
-```
-
-If editable install is blocked by environment permissions, run the module directly with `PYTHONPATH=src`.
-
-Generate synthetic multi-channel data and run the smoke experiment:
-
-```bash
-python -m scam_gnn.cli generate-synthetic --output artifacts/synthetic_events.csv
-python -m scam_gnn.cli run-research --config examples/configs/synthetic_research.json
-```
-
-Windows PowerShell alternative without editable install:
+Requirements: Python 3.11 or newer and the packages in `requirements.txt`.
 
 ```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli run-research --config examples\configs\synthetic_research.json
+# Start the demonstration (double-clicking run_demo.bat does the same)
+.\run_demo.bat
+
+# Re-train and re-evaluate everything (about 15 minutes on a laptop)
+$env:PYTHONPATH = "src"
+python -W ignore -m scam_gnn.train
+
+# Run the tests (about one minute)
+python -W ignore -m unittest discover -s tests -v
 ```
 
-Repo-root script alternatives:
+The demo and the training need no internet connection.
 
-```powershell
-python scripts\build_ui_db_local.py --config examples\configs\synthetic_research.json --db artifacts\ui\synthetic.db
-python scripts\serve_ui_local.py --db artifacts\ui\synthetic.db --host 127.0.0.1 --port 8000
+## Folders
+
 ```
-
-Run tests:
-
-```bash
-python -m unittest discover -s tests -v
+config.json        all settings
+data/public/       the three datasets
+src/scam_gnn/      the pipeline (one file per stage)
+app/               the demonstration and its test inputs
+results/           trained model, results.json, predictions
+tests/             automated checks
+docs/              the project handbook
+_archive/          files from the earlier version that are no longer used (safe to delete)
 ```
-
-Embedding note:
-
-- Text embeddings now default to local-only loading.
-- If `all-MiniLM-L6-v2` is not already cached locally, the pipeline falls back to deterministic hashed text embeddings instead of trying to download from Hugging Face.
-- Set `SCAM_GNN_ALLOW_REMOTE_EMBEDDINGS=1` if you explicitly want remote embedding model downloads.
-
-## UI Product Spec
-
-The analyst and research UI product requirements are documented in [docs/scam_detection_ui_prd.md](c:\Users\user\Desktop\Ibrahims project\docs\scam_detection_ui_prd.md).
-
-## Config-Driven Workflow
-
-Example configs live in [examples/configs/synthetic_research.json](c:\Users\user\Desktop\Ibrahims project\examples\configs\synthetic_research.json).
-
-An FDB-style benchmark template is also included at [examples/configs/fdb_benchmark_template.json](c:\Users\user\Desktop\Ibrahims project\examples\configs\fdb_benchmark_template.json). The benchmark track expects locally exported CSV tables; this scaffold does not download benchmark datasets automatically.
-
-The main CLI entrypoint reads JSON configs and will:
-
-1. load or synthesize events
-2. build rolling time-based splits
-3. construct heterogeneous graph tables
-4. derive message and entity features
-5. train baselines
-6. train GNNs when `torch` and `torch-geometric` are installed
-7. compute aggregate and per-channel metrics
-8. generate targeted error-analysis slices
-
-## Public Data Targets
-
-The scaffold expects the following data sources when you move beyond synthetic data:
-
-- SMS: UCI SMS Spam Collection
-- Email: Enron and TREC Spam corpora
-- URL/domain: PhiUSIIL or malicious URL corpora
-- Benchmark tabular fraud: Amazon Science FDB
-
-No public benchmark already fuses SMS, email, and URL/domain infrastructure into one graph. The custom track is intended to fill that gap.
-
-## First Real Public Dataset
-
-The fastest real-data path is the official UCI SMS Spam Collection.
-
-Prepare it:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli prepare-uci-sms --output data\public\uci_sms_spam_collection.csv
-```
-
-Run the research pipeline on it:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli run-research --config examples\configs\uci_sms_research.json
-```
-
-Notes:
-
-- UCI SMS Spam Collection does not include sender IDs, recipients, or native timestamps.
-- This scaffold assigns deterministic synthetic timestamps in message order.
-- It derives a provisional `sender_key` from phone numbers or URLs found in the message text when available, otherwise it uses `sms_sender_unknown`.
-- This gives you a real public dataset connected to the existing graph pipeline, while keeping the project ready for richer email and URL datasets later.
-
-## Second Real Dataset And Multichannel Run
-
-The second real public dataset wired into this scaffold is the official UCI PhiUSIIL phishing URL dataset.
-
-Prepare it:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli prepare-phiusiil-url --output data\public\phiusiil_url_collection.csv
-```
-
-Run the URL-only experiment:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli run-research --config examples\configs\phiusiil_url_research.json
-```
-
-Run the combined real multichannel experiment:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m scam_gnn.cli run-research --config examples\configs\uci_sms_phiusiil_multichannel.json
-```
-
-Build and serve the analyst UI from real multichannel data:
-
-```powershell
-python scripts\build_ui_db_local.py --config examples\configs\uci_sms_phiusiil_multichannel.json --db artifacts\ui\scam_intelligence.db --model auto
-python scripts\serve_ui_local.py --db artifacts\ui\scam_intelligence.db --host 127.0.0.1 --port 8000
-```
-
-Build an HGT-backed UI database explicitly:
-
-```powershell
-python scripts\build_ui_db_local.py --config examples\configs\uci_sms_phiusiil_multichannel.json --db artifacts\ui\scam_intelligence_hgt.db --model hetero_hgt --seed 7
-python scripts\serve_ui_local.py --db artifacts\ui\scam_intelligence_hgt.db --host 127.0.0.1 --port 8000
-```
-
-Notes:
-
-- The multichannel config combines real SMS data with real phishing URL data.
-- The URL dataset is capped to `15000` rows in the provided config so the baseline run stays practical in this environment.
-- PhiUSIIL labels are inverted during preprocessing so `1` means malicious in this project.
-- Many original numeric URL features are preserved and appended to the message feature matrix automatically.
-- When public datasets do not include native timestamps, the scaffold interleaves channels and assigns synthetic timestamps so time-based splits still contain multiple channels.
-- If you build the UI with `--model hetero_hgt`, the selected HGT run is written into the SQLite experiment tables even when the older summary JSON on disk does not contain HGT metrics yet.
