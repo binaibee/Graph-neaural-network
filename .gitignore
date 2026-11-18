@@ -11,6 +11,6 @@ build/
 *.egg-info/
 *.pyc
 results/cache/
-results/prepared.pkl
+/.streamlit/secrets.toml
 data/raw/
 models/

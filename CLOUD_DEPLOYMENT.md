@@ -1,32 +1,29 @@
-# Cloud deployment
+# Streamlit Cloud deployment
 
-This project is a Streamlit app. Streamlit Community Cloud is the simplest initial host because the demo already uses Streamlit and Community Cloud deploys directly from a GitHub repository.
+This project runs directly from the public GitHub repository. It uses the existing datasets and saved model artifacts; it does not require a second private repository, access token, Streamlit secret, or artifact download step.
 
-## App settings
+## Required repository files
 
-- Repository: `binaibee/Graph-neaural-network`
-- Branch: `main`
-- App file: `app/app.py`
-- Python version: `3.12` (the project requires Python 3.11 or newer)
-- Dependencies: `requirements.txt`
-
-The app needs the complete project source and these runtime artifacts in the deployed checkout:
+Keep these files committed alongside the app:
 
 - `config.json`
-- `results/model.pt`
+- `data/public/uci_sms_spam_collection.csv`
+- `data/public/phiusiil_url_collection.csv`
+- `data/public/spamassassin_email.csv`
 - `results/prepared.pkl`
+- `results/model.pt`
 - `results/predictions.csv`
 - `results/results.json`
-- `data/public/` files referenced by `config.json`
 
-`results/prepared.pkl` is ignored by Git in the current project configuration, so it must be explicitly included in the deployment commit (or moved to an artifact store with a download step). It is about 26 MB. Verify the repository's visibility and review the exact files before pushing: the datasets include public research email/message records, and a public repository makes every pushed file downloadable.
+The saved graph, weights, prediction index, and email dataset are present locally. `results/prepared.pkl` is normally ignored, so it must be explicitly added to Git for the cloud build.
 
 ## Deploy
 
-1. Commit the intended app source, dependencies, configuration, and required runtime artifacts to the GitHub branch selected above.
-2. Sign in to [Streamlit Community Cloud](https://share.streamlit.io/) with the GitHub account that has admin access to the repository.
-3. Choose **Create app**, then select `binaibee/Graph-neaural-network`, branch `main`, and `app/app.py`.
-4. In advanced settings, select Python 3.12 and deploy.
-5. Confirm the app loads, then try one SMS, one email, and one web link in the demo.
+1. Push the deployment commit to the existing public GitHub repository using a normal push.
+2. In Streamlit Community Cloud, choose **Create app** and select `binaibee/Graph-neaural-network`, branch `main`, and `app/app.py`.
+3. Select Python 3.12 and deploy. Community Cloud installs the packages listed in the root `requirements.txt`.
+4. No app secrets or private artifact settings are needed.
 
-Community Cloud installs dependencies from `requirements.txt`; a deployment failure may require pinning compatible package versions. Keep secrets out of the repository. This demo does not need secrets.
+The application loads the saved graph, model, and prediction index through the existing project configuration. The GNN architecture, evaluation results, and SMS, email, and web-link channels are unchanged.
+
+See Streamlit's [deployment guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy) and [dependency guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies).
